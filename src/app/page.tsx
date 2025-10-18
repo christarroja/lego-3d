@@ -1,9 +1,9 @@
-import { XMasBalls } from "./components/XMasBalls";
+import { LegoPlayground } from "./components/LegoPlayground";
 
 export default function Home() {
   return (
     <div className="w-full h-screen">
-      <XMasBalls />
+      <LegoPlayground />
     </div>
   );
 }
