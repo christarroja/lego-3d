@@ -39,8 +39,9 @@ const LEGO_COLORS = [
   "#FFFFFF", // White
 ];
 
-// LEGO number of bricks - optimized for older hardware
-const NUM_BRICKS = 500;
+// LEGO number of bricks - configurable for different hardware
+// Recommended: 50-100 (smooth), 100-200 (good), 200-300 (high-end), 300+ (very powerful)
+const NUM_BRICKS = 300;
 
 // Shared materials for better performance
 const BRICK_MATERIALS = LEGO_COLORS.map(
@@ -165,18 +166,19 @@ function LegoBrick({
     }
   });
 
-  // Optimize physics for distant bricks - but ensure all bricks fall initially
+  // Optimize physics for distant bricks
   const isNearCamera = distanceFromCamera < 10;
 
   return (
     <RigidBody
-      linearDamping={isNearCamera ? 0.5 : 0.8} // Higher damping for distant bricks
-      angularDamping={isNearCamera ? 0.15 : 0.3} // Higher damping for distant bricks
+      linearDamping={isNearCamera ? 0.5 : 0.7} // Higher damping for distant bricks
+      angularDamping={isNearCamera ? 0.15 : 0.25} // Higher damping for distant bricks
       friction={0.8}
       position={position}
       ref={api}
       colliders={false}
-      ccd={isNearCamera} // Only enable CCD for near bricks to save performance
+      ccd={true} // Keep CCD enabled to prevent tunneling
+      canSleep={true} // Allow bricks to sleep when stationary (auto by default)
     >
       <CuboidCollider
         args={[
@@ -195,10 +197,10 @@ function Pointer() {
   const ref = useRef<RapierRigidBody>(null);
   const vecRef = useRef(new THREE.Vector3());
 
-  useFrame(({ mouse, viewport }) => {
+  useFrame(({ pointer, viewport }) => {
     const target = new THREE.Vector3(
-      (mouse.x * viewport.width) / 2,
-      (mouse.y * viewport.height) / 2,
+      (pointer.x * viewport.width) / 2,
+      (pointer.y * viewport.height) / 2,
       0
     );
     vecRef.current.lerp(target, 0.2);
@@ -244,8 +246,38 @@ function Floor() {
   );
 }
 
+// FPS Monitor Component
+function FPSMonitor({ onFPSUpdate }: { onFPSUpdate: (fps: number) => void }) {
+  const lastTime = useRef(0);
+  const frameCount = useRef(0);
+
+  useFrame(() => {
+    const now = performance.now();
+
+    // Initialize on first frame
+    if (lastTime.current === 0) {
+      lastTime.current = now;
+      return;
+    }
+
+    frameCount.current++;
+    const delta = now - lastTime.current;
+
+    // Update FPS every second
+    if (delta >= 1000) {
+      const fps = Math.round((frameCount.current * 1000) / delta);
+      onFPSUpdate(fps);
+      frameCount.current = 0;
+      lastTime.current = now;
+    }
+  });
+
+  return null;
+}
+
 export const LegoPlayground = () => {
   const [resetKey, setResetKey] = useState(0);
+  const [fps, setFps] = useState(60);
 
   const handleReset = () => {
     setResetKey((prev) => prev + 1);
@@ -260,6 +292,11 @@ export const LegoPlayground = () => {
       >
         🔄 Reset
       </button>
+
+      {/* FPS Counter */}
+      <div className="fixed top-5 left-5 z-[1000] px-4 py-2 bg-black/50 text-white rounded-lg text-sm font-mono">
+        FPS: {fps} | Bricks: {NUM_BRICKS}
+      </div>
 
       <Canvas
         shadows
@@ -283,8 +320,13 @@ export const LegoPlayground = () => {
         />
         <directionalLight position={[-10, -10, -5]} intensity={0.2} />
 
+        {/* <FPSMonitor onFPSUpdate={setFps} /> */}
         <Suspense fallback={null}>
-          <Physics gravity={[0, -9.8, 0]} key={resetKey}>
+          <Physics
+            gravity={[0, -9.8, 0]}
+            key={resetKey}
+            timeStep={1 / 60} // Fixed 60 FPS physics step
+          >
             <Floor />
             <Pointer />
             {baubles.map((props, i) => (
