@@ -39,11 +39,25 @@ const LEGO_COLORS = [
   "#FFFFFF", // White
 ];
 
-// LEGO number of bricks
-const NUM_BRICKS = 200;
+// LEGO number of bricks - optimized for older hardware
+const NUM_BRICKS = 500;
 
-// Create a LEGO brick geometry (2x4 brick)
-function createLegoBrick(width: number, depth: number) {
+// Shared materials for better performance
+const BRICK_MATERIALS = LEGO_COLORS.map(
+  (color) =>
+    new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.3,
+      metalness: 0.1,
+    })
+);
+
+// Create a LEGO brick geometry (2x4 brick) - optimized version
+function createLegoBrick(
+  width: number,
+  depth: number,
+  useSimpleGeometry = false
+) {
   const group = new THREE.Group();
 
   // Main brick body
@@ -57,12 +71,12 @@ function createLegoBrick(width: number, depth: number) {
   bodyMesh.receiveShadow = true;
   group.add(bodyMesh);
 
-  // Add studs on top
+  // Add studs on top - use simpler geometry for performance
   const studGeometry = new THREE.CylinderGeometry(
     STUD_RADIUS,
     STUD_RADIUS,
     STUD_HEIGHT,
-    16
+    useSimpleGeometry ? 8 : 16 // Fewer segments for distant bricks
   );
 
   for (let x = 0; x < width; x++) {
@@ -83,7 +97,7 @@ function createLegoBrick(width: number, depth: number) {
 
 const baubles = [...Array(NUM_BRICKS)].map((_, index) => {
   const angle = (index / NUM_BRICKS) * Math.PI * 2;
-  const radius = 8;
+  const radius = 12; // Increased radius for better distribution
   const brickTypes = [
     { width: 2, depth: 2 },
     { width: 2, depth: 4 },
@@ -91,14 +105,20 @@ const baubles = [...Array(NUM_BRICKS)].map((_, index) => {
   ];
   const brickType = brickTypes[index % brickTypes.length];
 
+  // Create more varied starting positions to avoid initial collisions
+  const heightVariation = Math.sin(index * 0.3) * 3;
+  const xOffset = (Math.sin(index * 0.5) - 0.5) * 6;
+  const zOffset = (Math.sin(index * 0.7) - 0.5) * 6;
+
   return {
     width: brickType.width,
     depth: brickType.depth,
     color: LEGO_COLORS[index % LEGO_COLORS.length],
+    index,
     position: [
-      Math.cos(angle) * radius + (Math.sin(index * 0.5) - 0.5) * 4,
-      Math.sin(angle) * radius + (Math.cos(index * 0.7) - 0.5) * 4 + 10, // Raised up
-      (Math.sin(index * 0.3) - 0.5) * 6,
+      Math.cos(angle) * radius + xOffset,
+      8 + heightVariation, // Start higher for better falling effect
+      Math.sin(angle) * radius + zOffset,
     ] as [number, number, number],
   };
 });
@@ -108,79 +128,55 @@ function LegoBrick({
   depth,
   color,
   position,
+  index,
 }: {
   width: number;
   depth: number;
   color: string;
   position: [number, number, number];
+  index: number;
 }) {
   const api = useRef<RapierRigidBody>(null);
-  // const [isDragging, setIsDragging] = useState(false);
-  const legoBrick = createLegoBrick(width, depth);
 
-  // Apply material to all meshes in the group
-  const brickMaterial = new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.3,
-    metalness: 0.1,
-  });
+  // Calculate distance from camera for LOD
+  const distanceFromCamera = Math.sqrt(
+    position[0] * position[0] +
+      position[1] * position[1] +
+      position[2] * position[2]
+  );
 
+  // Use simpler geometry for distant bricks
+  const useSimpleGeometry = distanceFromCamera > 15;
+  const legoBrick = createLegoBrick(width, depth, useSimpleGeometry);
+
+  // Get material from shared pool
+  const colorIndex = LEGO_COLORS.indexOf(color);
+  const brickMaterial = BRICK_MATERIALS[colorIndex] || BRICK_MATERIALS[0];
+
+  // Apply shared material to all meshes in the group
   legoBrick.traverse((child) => {
     if (child instanceof THREE.Mesh) {
       child.material = brickMaterial;
+      // Disable shadows for distant bricks to improve performance
+      if (distanceFromCamera > 20 || index % 3 !== 0) {
+        child.castShadow = false;
+        child.receiveShadow = false;
+      }
     }
   });
 
-  // DRAG & DROP CODE - Commented out for now
-  // // Handle drag start
-  // const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-  //   e.stopPropagation();
-  //   setIsDragging(true);
-  //   document.body.style.cursor = "grabbing";
-
-  //   if (api.current) {
-  //     // Switch to kinematic so it doesn't fall while dragging
-  //     api.current.setBodyType(1, true); // 1 = kinematic
-
-  //     // Reset velocity when picking up
-  //     api.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-  //     api.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-  //   }
-  // };
-
-  // // Handle drag move
-  // useFrame((state) => {
-  //   if (isDragging && api.current) {
-  //     const { mouse, viewport } = state;
-
-  //     // Simple 2D mouse to 3D world conversion
-  //     // Keep the brick at z=0 plane
-  //     const x = (mouse.x * viewport.width) / 2;
-  //     const y = (mouse.y * viewport.height) / 2;
-
-  //     api.current.setTranslation({ x, y, z: 0 }, true);
-  //   }
-  // });
-
-  // // Handle drag end (global listener)
-  // const handlePointerUp = () => {
-  //   if (isDragging && api.current) {
-  //     setIsDragging(false);
-  //     document.body.style.cursor = "grab";
-  //     // Switch back to dynamic so physics works again
-  //     api.current.setBodyType(0, true); // 0 = dynamic
-  //   }
-  // };
+  // Optimize physics for distant bricks - but ensure all bricks fall initially
+  const isNearCamera = distanceFromCamera < 10;
 
   return (
     <RigidBody
-      linearDamping={0.5}
-      angularDamping={0.15}
+      linearDamping={isNearCamera ? 0.5 : 0.8} // Higher damping for distant bricks
+      angularDamping={isNearCamera ? 0.15 : 0.3} // Higher damping for distant bricks
       friction={0.8}
       position={position}
       ref={api}
       colliders={false}
-      ccd={true}
+      ccd={isNearCamera} // Only enable CCD for near bricks to save performance
     >
       <CuboidCollider
         args={[
@@ -190,26 +186,6 @@ function LegoBrick({
         ]}
       />
       <primitive object={legoBrick} />
-      {/* DRAG & DROP INTERACTION MESH - Commented out for now */}
-      {/* <group>
-        <primitive object={legoBrick} />
-        <mesh
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          onPointerEnter={(e) => {
-            e.stopPropagation();
-            document.body.style.cursor = "grab";
-          }}
-          onPointerLeave={() => {
-            document.body.style.cursor = "default";
-          }}
-        >
-          <boxGeometry
-            args={[width * LEGO_UNIT, BRICK_HEIGHT, depth * LEGO_UNIT]}
-          />
-          <meshBasicMaterial transparent opacity={0} />
-        </mesh>
-      </group> */}
     </RigidBody>
   );
 }
@@ -289,18 +265,30 @@ export const LegoPlayground = () => {
         shadows
         camera={{ position: [0, 2, 20], fov: 45, near: 1, far: 100 }}
         className="w-full h-full"
+        dpr={[1, 2]} // Limit pixel ratio for better performance
+        performance={{ min: 0.5 }} // Allow frame rate to drop for better performance
       >
         <color attach="background" args={["#1a1a1a"]} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
-        <directionalLight position={[-10, -10, -5]} intensity={0.3} />
+        <ambientLight intensity={0.4} />
+        <directionalLight
+          position={[10, 10, 5]}
+          intensity={0.8}
+          castShadow
+          shadow-mapSize={[1024, 1024]} // Smaller shadow map for performance
+          shadow-camera-far={50}
+          shadow-camera-left={-20}
+          shadow-camera-right={20}
+          shadow-camera-top={20}
+          shadow-camera-bottom={-20}
+        />
+        <directionalLight position={[-10, -10, -5]} intensity={0.2} />
 
         <Suspense fallback={null}>
           <Physics gravity={[0, -9.8, 0]} key={resetKey}>
             <Floor />
             <Pointer />
             {baubles.map((props, i) => (
-              <LegoBrick key={i} {...props} />
+              <LegoBrick key={i} {...props} index={i} />
             ))}
           </Physics>
         </Suspense>
