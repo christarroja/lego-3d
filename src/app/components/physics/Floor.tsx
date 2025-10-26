@@ -1,6 +1,5 @@
 "use client";
 
-import * as THREE from "three";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 
 export function Floor() {

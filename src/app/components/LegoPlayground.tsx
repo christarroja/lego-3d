@@ -3,11 +3,25 @@
 import { Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
+import { LoadingSpinner } from "./ui";
 
-// Extracted components
-import { LegoBrick } from "./brick/LegoBrick";
-import { Pointer } from "./physics/Pointer";
-import { Floor } from "./physics/Floor";
+// Dynamically import heavy 3D components
+import dynamic from "next/dynamic";
+
+const LegoBrick = dynamic(
+  () => import("./brick/LegoBrick").then((mod) => ({ default: mod.LegoBrick })),
+  { ssr: false }
+);
+const Pointer = dynamic(
+  () => import("./physics/Pointer").then((mod) => ({ default: mod.Pointer })),
+  { ssr: false }
+);
+const Floor = dynamic(
+  () => import("./physics/Floor").then((mod) => ({ default: mod.Floor })),
+  { ssr: false }
+);
+
+// UI components (keep these synchronous as they're lightweight)
 import { FPSMonitor } from "./ui/FPSMonitor";
 import { ResetButton } from "./ui/ResetButton";
 import { FPSCounter } from "./ui/FPSCounter";
@@ -32,133 +46,62 @@ export const LegoPlayground = () => {
       <ResetButton onReset={handleReset} />
       <FPSCounter fps={fps} />
 
-      <Canvas
-        shadows
-        camera={{ position: [0, 2, 20], fov: 45, near: 1, far: 100 }}
-        className="w-full h-full"
-        dpr={[1, 2]} // Limit pixel ratio for better performance
-        performance={{ min: 0.5 }} // Allow frame rate to drop for better performance
-      >
-        <color attach="background" args={["#1a1a1a"]} />
-        <ambientLight intensity={0.4} />
-        <directionalLight
-          position={[10, 10, 5]}
-          intensity={0.8}
-          castShadow
-          shadow-mapSize={[1024, 1024]} // Smaller shadow map for performance
-          shadow-camera-far={50}
-          shadow-camera-left={-20}
-          shadow-camera-right={20}
-          shadow-camera-top={20}
-          shadow-camera-bottom={-20}
-        />
-        <directionalLight position={[-10, -10, -5]} intensity={0.2} />
-
-        <FPSMonitor onFPSUpdate={setFps} />
-        <Suspense fallback={null}>
-          <Physics
-            gravity={[0, -9.8, 0]}
-            key={resetKey}
-            timeStep={1 / 60} // Fixed 60 FPS physics step
+      <div className="relative w-full h-screen bg-black">
+        {/* Canvas Initialization Loading */}
+        <Suspense
+          fallback={
+            <div className="w-full h-screen bg-black">
+              <LoadingSpinner
+                size="md"
+                title="Initializing 3D Canvas"
+                subtitle="Setting up WebGL context..."
+              />
+            </div>
+          }
+        >
+          <Canvas
+            shadows
+            camera={{ position: [0, 2, 20], fov: 45, near: 1, far: 100 }}
+            className="w-full h-full"
+            dpr={[1, 2]} // Limit pixel ratio for better performance
+            performance={{ min: 0.5 }} // Allow frame rate to drop for better performance
           >
-            <Floor />
-            <Pointer />
-            {brickConfigurations.map((props, i) => (
-              <LegoBrick key={i} {...props} index={i} />
-            ))}
-          </Physics>
+            <color attach="background" args={["#1a1a1a"]} />
+            <ambientLight intensity={0.4} />
+            <directionalLight
+              position={[10, 10, 5]}
+              intensity={0.8}
+              castShadow
+              shadow-mapSize={[1024, 1024]} // Smaller shadow map for performance
+              shadow-camera-far={50}
+              shadow-camera-left={-20}
+              shadow-camera-right={20}
+              shadow-camera-top={20}
+              shadow-camera-bottom={-20}
+            />
+            <directionalLight position={[-10, -10, -5]} intensity={0.2} />
+
+            <FPSMonitor onFPSUpdate={setFps} />
+
+            {/* 3D Components inside Canvas */}
+            <Suspense
+              fallback={null} // No visual fallback inside Canvas
+            >
+              <Physics
+                gravity={[0, -9.8, 0]}
+                key={resetKey}
+                timeStep={1 / 60} // Fixed 60 FPS physics step
+              >
+                <Floor />
+                <Pointer />
+                {brickConfigurations.map((props, i) => (
+                  <LegoBrick key={i} {...props} index={i} />
+                ))}
+              </Physics>
+            </Suspense>
+          </Canvas>
         </Suspense>
-      </Canvas>
+      </div>
     </>
   );
 };
-
-// Alternative playground implementations for different use cases
-
-// Minimal playground for performance testing
-// export const MinimalPlayground = () => {
-//   const [resetKey, setResetKey] = useState(0);
-
-//   const handleReset = () => {
-//     setResetKey((prev) => prev + 1);
-//   };
-
-//   return (
-//     <Canvas
-//       shadows
-//       camera={{ position: [0, 2, 20], fov: 45 }}
-//       className="w-full h-full"
-//       dpr={1}
-//     >
-//       <color attach="background" args={["#1a1a1a"]} />
-//       <ambientLight intensity={0.6} />
-//       <directionalLight position={[10, 10, 5]} intensity={0.8} castShadow />
-
-//       <Suspense fallback={null}>
-//         <Physics gravity={[0, -9.8, 0]} key={resetKey}>
-//           <Floor />
-//           <Pointer />
-//           {generateBrickConfigurations(50).map((props, i) => (
-//             <LegoBrick key={i} {...props} index={i} />
-//           ))}
-//         </Physics>
-//       </Suspense>
-//     </Canvas>
-//   );
-// };
-
-// VR-compatible playground
-// export const VRPlayground = () => {
-//   return (
-//     <Canvas
-//       camera={{ position: [0, 1.6, 0], fov: 75 }}
-//       className="w-full h-full"
-//     >
-//       <color attach="background" args={["#87CEEB"]} />
-
-//       <Suspense fallback={null}>
-//         <Physics gravity={[0, -9.8, 0]}>
-//           <Floor />
-//           {/* VR-friendly controls and interactions */}
-//           {generateBrickConfigurations(100).map((props, i) => (
-//             <LegoBrick key={i} {...props} index={i} />
-//           ))}
-//         </Physics>
-//       </Suspense>
-//     </Canvas>
-//   );
-// };
-
-// Mobile-optimized playground
-// export const MobilePlayground = () => {
-//   return (
-//     <div className="w-full h-screen">
-//       <Canvas
-//         shadows
-//         camera={{ position: [0, 3, 25], fov: 50 }}
-//         className="w-full h-full"
-//         dpr={[1, 1.5]}
-//         performance={{ min: 0.3 }}
-//       >
-//         <color attach="background" args={["#1a1a1a"]} />
-//         <ambientLight intensity={0.5} />
-//         <directionalLight
-//           position={[10, 10, 5]}
-//           intensity={0.6}
-//           castShadow
-//           shadow-mapSize={[512, 512]}
-//         />
-
-//         <Suspense fallback={null}>
-//           <Physics gravity={[0, -9.8, 0]} timeStep={1 / 30}>
-//             <Floor />
-//             <Pointer />
-//             {generateBrickConfigurations(100).map((props, i) => (
-//               <LegoBrick key={i} {...props} index={i} />
-//             ))}
-//           </Physics>
-//         </Suspense>
-//       </Canvas>
-//     </div>
-//   );
-// };
