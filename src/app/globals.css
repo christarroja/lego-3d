@@ -4,3 +4,7 @@
   --background: #ffffff;
   --foreground: #171717;
 }
+
+body {
+  cursor: url('/white-cursor.svg') 16 16, auto;
+}

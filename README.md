@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LEGO 3D Components
 
-## Getting Started
+This is a simple React project to test r3f (React Three Fiber) and feature LEGO physics with the cursor.
 
-First, run the development server:
+## Directory Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+components/
+├── README.md
+├── LegoPlayground.tsx          # Main orchestrator component
+├── brick/                      # LEGO brick related components
+│   ├── index.ts
+│   ├── LegoBrick.tsx           # Individual LEGO brick component
+│   └── LegoBrickFactory.ts     # Brick creation and configuration logic
+├── physics/                    # Physics simulation components
+│   ├── index.ts
+│   ├── Floor.tsx               # Ground/floor component
+│   └── Pointer.tsx             # Interactive pointer/bulldozer
+├── ui/                         # User interface components
+│   ├── index.ts
+│   ├── FPSMonitor.tsx          # FPS tracking component
+│   ├── ResetButton.tsx         # Reset functionality button
+│   └── FPSCounter.tsx          # FPS display component
+├── constants/                  # Configuration constants
+│   ├── index.ts
+│   └── lego-constants.ts       # LEGO dimensions, colors, etc.
+├── fixtures/                   # Configuration presets and enums
+│   ├── index.ts
+│   └── lego-fixtures.ts        # Different size presets, performance configs
+├── types/                      # TypeScript type definitions
+│   ├── index.ts
+│   └── lego-types.ts           # Component prop types
+└── materials/                  # Shared materials for performance
+    ├── index.ts
+    └── brick-materials.ts      # Pre-created materials for bricks
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key Components
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Main Component
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **LegoPlayground.tsx**: The main orchestrator that brings everything together
 
-## Learn More
+### Brick Components
 
-To learn more about Next.js, take a look at the following resources:
+- **LegoBrick.tsx**: Individual LEGO brick with physics and LOD optimization
+- **LegoBrickFactory.ts**: Factory functions for creating different brick arrangements
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Physics Components
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Floor.tsx**: Ground plane with physics collision
+- **Pointer.tsx**: Interactive pointer that responds to mouse movement
 
-## Deploy on Vercel
+### UI Components
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **FPSMonitor.tsx**: Tracks and reports frame rate
+- **ResetButton.tsx**: Resets the simulation
+- **FPSCounter.tsx**: Displays current FPS and brick count
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Configuration
+
+- **lego-constants.ts**: Basic LEGO dimensions and colors
+- **lego-fixtures.ts**: Extended configurations, presets, and alternative implementations
+- **lego-types.ts**: TypeScript interfaces and types
+
+## Performance Optimizations
+
+The components include several performance optimizations:
+
+1. **Level of Detail (LOD)**: Distant bricks use simpler geometry
+2. **Material Sharing**: Pre-created materials reduce memory usage
+3. **Physics Optimization**: Distant bricks have reduced physics calculations
+4. **Shadow Optimization**: Selective shadow casting based on distance
+
+## Usage
+
+Import the main component:
+
+```tsx
+import { LegoPlayground } from "./components/LegoPlayground";
+
+// Use in your app
+<LegoPlayground />;
+```
+
+Or import individual components for custom setups:
+
+```tsx
+import { LegoBrick } from "./components/brick";
+import { Floor } from "./components/physics";
+import { generateSpiralBricks } from "./components/brick/LegoBrickFactory";
+```
+
+## Commented Code
+
+The refactoring preserves all commented code from the original file and adds additional commented implementations for:
+
+- Alternative brick arrangements (grid, random, tower)
+- Different pointer implementations (physics-based, touch-based)
+- Various floor types (textured, multi-level, debug)
+- Alternative playground configurations (minimal, VR, mobile)
+- Different material options
+
+## Migration from Original
+
+The original `LegoPlayground.tsx` file has been refactored into these smaller components while maintaining all functionality. The main differences are:
+
+1. Better separation of concerns
+2. Easier testing and maintenance
+3. More flexible configuration options
+4. Preserved performance optimizations
+5. Enhanced type safety
+
+## Future Enhancements
+
+The modular structure makes it easy to add:
+
+- New brick types and arrangements
+- Different interaction modes
+- Alternative physics configurations
+- Enhanced visual effects
+- Mobile and VR optimizations
